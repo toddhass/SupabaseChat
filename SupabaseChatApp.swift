@@ -1,50 +1,28 @@
 import SwiftUI
 import Supabase
 
-// Note: This App implementation is kept for reference, but on Replit
-// we will use the simple HTTP server defined in main.swift instead
-
+@main
 struct SupabaseChatApp: App {
-    // Initialize the Supabase client
-    // Get the Supabase URL and API key from environment variables
-    private var supabaseURL: URL {
-        if let urlString = ProcessInfo.processInfo.environment["SUPABASE_URL"],
-           let url = URL(string: urlString) {
-            return url
-        } else {
-            print("WARNING: SUPABASE_URL environment variable not set. Using placeholder URL.")
-            print("To use this app with Supabase, set the SUPABASE_URL environment variable.")
-            return URL(string: "https://your-project-url.supabase.co")!
-        }
-    }
-    
-    private var supabaseKey: String {
-        if let key = ProcessInfo.processInfo.environment["SUPABASE_KEY"] {
-            return key
-        } else {
-            print("WARNING: SUPABASE_KEY environment variable not set. Using placeholder key.")
-            print("To use this app with Supabase, set the SUPABASE_KEY environment variable.")
-            return "your-supabase-anon-key"
-        }
-    }
-    
-    // Create Supabase client
-    private lazy var supabaseClient = SupabaseClient(
-        supabaseURL: supabaseURL,
-        supabaseKey: supabaseKey
-    )
-    
-    // Create our services
-    private var supabaseService: SupabaseService
-    private var chatService: ChatService
+    private let supabaseClient: SupabaseClient
+    private let supabaseService: SupabaseService
+    private let chatService: ChatService
     
     init() {
         print("Initializing SupabaseChatApp...")
-        print("Supabase URL: \(self.supabaseURL)")
         
-        // Initialize services
-        self.supabaseService = SupabaseService(client: supabaseClient)
-        self.chatService = ChatService(supabaseService: supabaseService)
+        let url = URL(string: "https://hdzmbngzplkgkchmxfwu.supabase.co")!
+        let key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhkem1ibmd6cGxrZ2tjaG14Znd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzgyNzc3NjQsImV4cCI6MTk5Mzg1Mzc2NH0.ogb5FZ_nfUdIcobdas9EFm7u8vOs8-_RB2CB4MxLMAU"
+        
+        print("Supabase URL: \(url)")
+        print("Supabase Key: \(key.prefix(20))... [truncated]")
+        
+        let client = SupabaseClient(supabaseURL: url, supabaseKey: key)
+        let service = SupabaseService(client: client)
+        let chat = ChatService(supabaseService: service)
+        
+        self.supabaseClient = client
+        self.supabaseService = service
+        self.chatService = chat
         
         print("SupabaseChatApp initialized successfully")
     }
