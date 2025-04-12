@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct MessageRow: View {
     let message: Message
@@ -6,11 +7,9 @@ struct MessageRow: View {
     let isLoading: Bool
     @EnvironmentObject private var supabaseService: SupabaseService
     
-    // User profile for avatar display
     @State private var userProfile: User?
     @State private var isLoadingProfile = false
     
-    // Initialize with default isLoading = false for backward compatibility
     init(message: Message, isCurrentUser: Bool, isLoading: Bool = false) {
         self.message = message
         self.isCurrentUser = isCurrentUser
@@ -19,13 +18,10 @@ struct MessageRow: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            // Show avatar for other users (not current user)
             if !isCurrentUser {
-                // User avatar
                 if let user = userProfile {
                     ProfileImageView(user: user, size: 36, supabaseService: supabaseService)
                 } else if isLoadingProfile {
-                    // Loading avatar
                     Circle()
                         .fill(Color.gray.opacity(0.2))
                         .frame(width: 36, height: 36)
@@ -35,12 +31,11 @@ struct MessageRow: View {
                                 .scaleEffect(0.6)
                         )
                 } else {
-                    // Default avatar with auto-generated color based on user ID
                     Circle()
-                        .fill(generateColor(from: message.userId ?? "unknown"))
+                        .fill(generateColor(from: message.userId)) // userId is non-optional
                         .frame(width: 36, height: 36)
                         .overlay(
-                            Text(getInitials(from: message.username))
+                            Text(getInitials(from: message.username ?? "Unknown"))
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white)
                         )
@@ -50,7 +45,7 @@ struct MessageRow: View {
             VStack(alignment: isCurrentUser ? .trailing : .leading, spacing: 4) {
                 HStack(alignment: .bottom, spacing: 4) {
                     if !isCurrentUser {
-                        Text(message.username)
+                        Text(message.username ?? "Unknown")
                             .font(.caption)
                             .fontWeight(.bold)
                     }
@@ -68,23 +63,21 @@ struct MessageRow: View {
                     }
                 }
                 
-                Text(isLoading ? "Sending..." : message.createdAt.formatted())
+                Text(isLoading ? "Sending..." : message.createdAt.formatted()) // Line 65: Removed ?.
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .opacity(isLoading ? 0.7 : 1.0)
             }
             
-            // Add avatar for current user at the end
             if isCurrentUser {
                 if let currentUser = supabaseService.authService.currentUser {
                     ProfileImageView(user: currentUser, size: 36, supabaseService: supabaseService)
                 } else {
-                    // Default avatar for current user
                     Circle()
                         .fill(Color.blue)
                         .frame(width: 36, height: 36)
                         .overlay(
-                            Text(getInitials(from: message.username))
+                            Text(getInitials(from: message.username ?? "Unknown")) // Line 102: Replaced ! with ??
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.white)
                         )
@@ -98,10 +91,8 @@ struct MessageRow: View {
         }
     }
     
-    // Load the user profile for avatar display
     private func loadUserProfile() {
-        // Skip for current user as we already have their profile
-        if isCurrentUser || message.userId == nil {
+        if isCurrentUser || message.userId.isEmpty { // userId is String, not optional
             return
         }
         
@@ -109,7 +100,7 @@ struct MessageRow: View {
         
         Task {
             do {
-                let profile = try await supabaseService.getUserProfile(userId: message.userId!)
+                let profile = try await supabaseService.getUserProfile(userId: message.userId)
                 await MainActor.run {
                     userProfile = profile
                     isLoadingProfile = false
@@ -123,7 +114,6 @@ struct MessageRow: View {
         }
     }
     
-    // Get initials from username
     private func getInitials(from name: String) -> String {
         let components = name.components(separatedBy: .whitespacesAndNewlines)
         if components.count > 1, let first = components.first?.first, let last = components.last?.first {
@@ -135,24 +125,17 @@ struct MessageRow: View {
         }
     }
     
-    // Generate a consistent color based on user ID
     private func generateColor(from string: String) -> Color {
-        let colors: [Color] = [
-            .blue, .purple, .pink, .orange, .green, .teal, .indigo
-        ]
-        
-        // Generate a consistent index based on the string hash
+        let colors: [Color] = [.blue, .purple, .pink, .orange, .green, .teal, .indigo]
         var hash = 0
         for char in string {
             hash = (hash &* 31) &+ Int(char.asciiValue ?? 0)
         }
         let index = abs(hash) % colors.count
-        
         return colors[index]
     }
 }
 
-// Animated loading bubble for messages being sent
 struct LoadingBubble: View {
     let isCurrentUser: Bool
     @State private var isAnimating = false
@@ -182,7 +165,6 @@ struct LoadingBubble: View {
     }
 }
 
-// Bounce animation effect
 struct BounceEffect: GeometryEffect {
     var time: Double
     var bounceHeight: Double
@@ -204,9 +186,12 @@ struct MessageRow_Previews: PreviewProvider {
             MessageRow(
                 message: Message(
                     id: "1",
+                    userId: "user1",
                     username: "John",
                     content: "Hello, how are you?",
-                    createdAt: Date()
+                    createdAt: Date(),
+                    isEdited: false,
+                    updatedAt: Date()
                 ),
                 isCurrentUser: false
             )
@@ -214,9 +199,12 @@ struct MessageRow_Previews: PreviewProvider {
             MessageRow(
                 message: Message(
                     id: "2",
+                    userId: "user2",
                     username: "Me",
                     content: "I'm good, thanks for asking!",
-                    createdAt: Date()
+                    createdAt: Date(),
+                    isEdited: false,
+                    updatedAt: Date()
                 ),
                 isCurrentUser: true
             )
@@ -224,14 +212,18 @@ struct MessageRow_Previews: PreviewProvider {
             MessageRow(
                 message: Message(
                     id: "3",
+                    userId: "user2",
                     username: "Me",
                     content: "Sending a new message...",
-                    createdAt: Date()
+                    createdAt: Date(),
+                    isEdited: false,
+                    updatedAt: Date()
                 ),
                 isCurrentUser: true,
                 isLoading: true
             )
         }
         .padding()
+        .environmentObject(SupabaseService(client: SupabaseClient(supabaseURL: URL(string: "your-url")!, supabaseKey: "your-key")))
     }
 }

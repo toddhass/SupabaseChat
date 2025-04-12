@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 /// A view that displays the user's profile image
 struct ProfileImageView: View {
@@ -185,21 +186,21 @@ struct ProfileImageView: View {
 }
 
 #if DEBUG
-struct ProfileImageView_Previews: PreviewProvider {
-    static var previews: some View {
-        let mockUser = User(
-            id: "user1",
-            username: "Sarah Dev",
-            email: "sarah@example.com", 
-            avatarUrl: "https://ui-avatars.com/api/?name=Sarah&background=0D8ABC&color=fff"
-        )
-        
-        return ProfileImageView(
-            user: mockUser,
-            supabaseService: SupabaseService(client: SupabaseClient(supabaseURL: "", supabaseKey: ""))
-        )
-        .previewLayout(.sizeThatFits)
-        .padding()
-    }
-}
+//struct ProfileImageView_Previews: PreviewProvider {
+//    static var previews: some View {
+//        let mockUser = User(
+//            id: "user1",
+//            username: "Sarah Dev",
+//            email: "sarah@example.com", 
+//            avatarUrl: "https://ui-avatars.com/api/?name=Sarah&background=0D8ABC&color=fff"
+//        )
+//        
+//        return ProfileImageView(
+//            user: mockUser,
+//            supabaseService: SupabaseService(client: SupabaseClient(supabaseURL: "https://hdzmbngzplkgkchmxfwu.supabase.co", supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhkem1ibmd6cGxrZ2tjaG14Znd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzgyNzc3NjQsImV4cCI6MTk5Mzg1Mzc2NH0.ogb5FZ_nfUdIcobdas9EFm7u8vOs8-_RB2CB4MxLMAU"))
+//        )
+//        .previewLayout(.sizeThatFits)
+//        .padding()
+//    }
+//}
 #endif
