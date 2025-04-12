@@ -21,13 +21,11 @@ class AuthenticationService: ObservableObject {
     private let client: SupabaseClient
     private let logger = Logger(subsystem: "com.supachat.app", category: "AuthenticationService")
     
-    // Access to user info
     private(set) var session: Session?
     
     init(client: SupabaseClient) {
         self.client = client
         
-        // Try to restore session on init
         Task {
             await refreshSession()
         }
@@ -41,30 +39,31 @@ class AuthenticationService: ObservableObject {
         authError = nil
         
         do {
-            // Create the user in Auth
             let result = try await client.auth.signUp(
                 email: email,
                 password: password,
-                data: ["username": username]
+                data: ["username": AnyJSON.string(username)]
             )
             
-            if let session = result {
+            if let authSession = result.session {
                 self.session = Session(
-                    accessToken: session.accessToken,
-                    refreshToken: session.refreshToken,
-                    user: AuthUser(from: session.user),
-                    expiresAt: session.expiresAt
+                    accessToken: authSession.accessToken,
+                    refreshToken: authSession.refreshToken,
+                    user: AuthUser(from: authSession.user),
+                    expiresAt: Date(timeIntervalSince1970: authSession.expiresAt)
                 )
                 
                 if let newUser = User.fromSession(self.session!) {
                     self.currentUser = newUser
                     self.isAuthenticated = true
                 }
+            } else {
+                logger.info("Sign-up requires email confirmation; no session available yet.")
             }
         } catch {
             logger.error("Sign up failed: \(error.localizedDescription)")
             authError = "Sign up failed: \(error.localizedDescription)"
-            isLoading = false;
+            isLoading = false
             throw AuthError.signUpFailed(error.localizedDescription)
         }
         
@@ -77,17 +76,16 @@ class AuthenticationService: ObservableObject {
         authError = nil
         
         do {
-            // Sign in with email and password
-            let session = try await client.auth.signIn(
+            let authSession = try await client.auth.signIn(
                 email: email,
                 password: password
             )
             
             self.session = Session(
-                accessToken: session.accessToken,
-                refreshToken: session.refreshToken,
-                user: AuthUser(from: session.user),
-                expiresAt: session.expiresAt
+                accessToken: authSession.accessToken,
+                refreshToken: authSession.refreshToken,
+                user: AuthUser(from: authSession.user),
+                expiresAt: Date(timeIntervalSince1970: authSession.expiresAt)
             )
             
             if let user = User.fromSession(self.session!) {
@@ -97,7 +95,7 @@ class AuthenticationService: ObservableObject {
         } catch {
             logger.error("Sign in failed: \(error.localizedDescription)")
             authError = "Sign in failed: \(error.localizedDescription)"
-            isLoading = false;
+            isLoading = false
             throw AuthError.signInFailed(error.localizedDescription)
         }
         
@@ -116,7 +114,7 @@ class AuthenticationService: ObservableObject {
         } catch {
             logger.error("Sign out failed: \(error.localizedDescription)")
             authError = "Sign out failed: \(error.localizedDescription)"
-            isLoading = false;
+            isLoading = false
             throw AuthError.signOutFailed(error.localizedDescription)
         }
         
@@ -126,13 +124,13 @@ class AuthenticationService: ObservableObject {
     @MainActor
     func refreshSession() async {
         do {
-            let session = try await client.auth.session
+            let authSession = try await client.auth.session
             
             self.session = Session(
-                accessToken: session.accessToken,
-                refreshToken: session.refreshToken,
-                user: AuthUser(from: session.user),
-                expiresAt: session.expiresAt
+                accessToken: authSession.accessToken,
+                refreshToken: authSession.refreshToken,
+                user: AuthUser(from: authSession.user),
+                expiresAt: Date(timeIntervalSince1970: authSession.expiresAt)
             )
             
             if let user = User.fromSession(self.session!) {
@@ -149,26 +147,27 @@ class AuthenticationService: ObservableObject {
     
     @MainActor
     func updateUserProfile(username: String, avatarUrl: String? = nil) async throws {
-        guard isAuthenticated, let user = currentUser else {
+        guard isAuthenticated, let _ = currentUser else {
             throw AuthError.notAuthenticated
         }
         
         isLoading = true
         
         do {
-            var userData: [String: Any] = ["username": username]
-            if let avatarUrl = avatarUrl {
-                userData["avatar_url"] = avatarUrl
-            }
+            let userAttributes = UserAttributes(
+                data: [
+                    "username": AnyJSON.string(username),
+                    "avatar_url": avatarUrl.map { AnyJSON.string($0) } ?? AnyJSON.null
+                ]
+            )
             
-            _ = try await client.auth.update(user: userData)
+            _ = try await client.auth.update(user: userAttributes)
             
-            // Refresh the session to get updated user data
             await refreshSession()
         } catch {
             logger.error("Profile update failed: \(error.localizedDescription)")
             authError = "Profile update failed: \(error.localizedDescription)"
-            isLoading = false;
+            isLoading = false
             throw error
         }
         
@@ -178,15 +177,15 @@ class AuthenticationService: ObservableObject {
 
 // Helper extension to convert Supabase Auth User to our AuthUser model
 private extension AuthUser {
-    init(from authUser: User) {
+    init(from authUser: Auth.User) {
         self.id = authUser.id
         self.email = authUser.email
         
-        var metadata: [String: Any] = [:]
-        if let username = authUser.userMetadata?["username"] as? String {
+        var metadata: [String: String] = [:]
+        if let username = authUser.userMetadata["username"] as? String {
             metadata["username"] = username
         }
-        if let avatarUrl = authUser.userMetadata?["avatar_url"] as? String {
+        if let avatarUrl = authUser.userMetadata["avatar_url"] as? String {
             metadata["avatar_url"] = avatarUrl
         }
         self.userMetadata = metadata
